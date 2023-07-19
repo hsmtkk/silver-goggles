@@ -1,0 +1,47 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  RESOURCE_GROUP: python-container
+  LOCATION: westus
+  REGISTRY: silvergoggles1554
+  POSTGRES_NAME: silvergoggles1554
+  ADMIN_USER: myroot
+  ADMIN_PASSWORD: Password-01
+  CNT_APP_ENV: python-container-env
+  CNT_APP: python-container-app
+  REGISTRY_USER: silvergoggles1554
+  REGISTRY_PASSWORD: A0x1/RFbXbRrs9n8w6sHjk7Wu+ZW15e2vaGAkgf8UR+ACRCD2nfX
+
+tasks:
+  group-create:
+    cmds:
+    - az group create --name {{.RESOURCE_GROUP}} --location {{.LOCATION}}
+  acr-create:
+    cmds:
+    - az acr create --resource-group {{.RESOURCE_GROUP}} --name {{.REGISTRY}} --sku Basic --admin-enabled
+  acr-sign-in:
+    cmds:
+    - az acr login --name {{.REGISTRY}}
+  acr-build:
+    cmds:
+    - az acr build --registry {{.REGISTRY}} --resource-group {{.RESOURCE_GROUP}} --image python-container:latest .
+  acr-repository-list:
+    cmds:
+    - az acr repository list --name {{.REGISTRY}}
+  psql-create:
+    cmds:
+    - az postgres flexible-server create --resource-group {{.RESOURCE_GROUP}} --name {{.POSTGRES_NAME}}  --location {{.LOCATION}} --admin-user {{.ADMIN_USER}} --admin-password {{.ADMIN_PASSWORD}} --sku-name Standard_D2s_v3 --public-access 0.0.0.0
+  psql-connect:
+    cmds:
+    - psql -h {{.POSTGRES_NAME}}.postgres.database.azure.com -p 5432 -U {{.ADMIN_USER}} postgres
+  cntapp-env-create:
+    cmds:
+    - az containerapp env create --name {{.CNT_APP_ENV}} --resource-group {{.RESOURCE_GROUP}} --location {{.LOCATION}}
+  cntapp-create:
+    cmds:
+    - az containerapp create --name {{.CNT_APP}} --resource-group {{.RESOURCE_GROUP}} --image {{.REGISTRY}}.azurecr.io/python-container:latest --environment {{.CNT_APP_ENV}} --ingress external --target-port 8000 --registry-server {{.REGISTRY}}.azurecr.io --registry-username {{.REGISTRY_USER}} --registry-password {{.REGISTRY_PASSWORD}} --query properties.configuration.ingress.fqdn --env-vars AZURE_POSTGRESQL_HOST="{{.POSTGRES_NAME}}.postgres.database.azure.com" AZURE_POSTGRESQL_DATABASE="restaurants_reviews" AZURE_POSTGRESQL_USERNAME="{{.ADMIN_USER}}" AZURE_POSTGRESQL_PASSWORD="{{.ADMIN_PASSWORD}}" RUNNING_IN_PRODUCTION="1" AZURE_SECRET_KEY=asdfasdfasdf
+  destroy:
+    cmds:
+    - az group delete --name {{.RESOURCE_GROUP}}
